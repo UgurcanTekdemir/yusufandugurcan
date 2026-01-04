@@ -3,40 +3,40 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { sportmonksClient } from "@/lib/sportmonks/client";
 import {
-  SportMonksLeagueSchema,
+  SportMonksFixtureSchema,
   SportMonksResponseSchema,
 } from "@/lib/sportmonks/schemas";
-import { normalizeLeagues } from "@/lib/sportmonks/dto";
+import { normalizeFixtures } from "@/lib/sportmonks/dto";
 import { withRateLimit } from "@/lib/rateLimit/middleware";
 
 const QuerySchema = z.object({
-  countryId: z.string().optional(),
   locale: z.string().optional(),
 });
 
 /**
- * GET /api/sm/leagues?countryId=123&locale=en
- * Fetch leagues from SportMonks API (1-5 min cache)
+ * GET /api/sm/football/livescores/latest?locale=en
+ * Fetch latest live scores (updated in last 10 seconds) from SportMonks API (10s cache)
  */
 async function handler(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const query = QuerySchema.parse({
-      countryId: searchParams.get("countryId") || undefined,
       locale: searchParams.get("locale") || undefined,
     });
 
-    const countryId = query.countryId ? Number(query.countryId) : undefined;
-    const response = await sportmonksClient.getLeagues(countryId, query.locale);
+    const response = await sportmonksClient.getLivescoresLatest(query.locale);
     const validated = SportMonksResponseSchema.parse(response);
-    const leagues = (validated.data as unknown[]).map((item) =>
-      SportMonksLeagueSchema.parse(item)
+    const fixtures = (validated.data as unknown[]).map((item) =>
+      SportMonksFixtureSchema.parse(item)
     );
-    const normalized = normalizeLeagues(leagues);
+    const normalized = normalizeFixtures(fixtures);
 
-    return NextResponse.json(normalized);
+    // Filter to only live fixtures
+    const liveFixtures = normalized.filter((f) => f.isLive);
+
+    return NextResponse.json(liveFixtures);
   } catch (error) {
-    console.error("Error fetching leagues:", error);
+    console.error("Error fetching latest livescores:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid query parameters", details: error.errors },
@@ -50,10 +50,11 @@ async function handler(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: "Failed to fetch leagues" },
+      { error: "Failed to fetch latest livescores" },
       { status: 500 }
     );
   }
 }
 
 export const GET = withRateLimit(handler);
+

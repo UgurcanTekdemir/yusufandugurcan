@@ -13,6 +13,7 @@
   "dependencies": {
     "@repo/shared": "*",
     "@tanstack/react-query": "^5.17.19",
+    "@upstash/redis": "^1.29.2",
     "firebase": "^10.7.1",
     "firebase-admin": "^12.0.0",
     "lucide-react": "^0.562.0",

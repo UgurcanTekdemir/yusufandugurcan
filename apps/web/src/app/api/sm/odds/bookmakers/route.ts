@@ -2,41 +2,30 @@ import "server-only";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { sportmonksClient } from "@/lib/sportmonks/client";
-import {
-  SportMonksLeagueSchema,
-  SportMonksResponseSchema,
-} from "@/lib/sportmonks/schemas";
-import { normalizeLeagues } from "@/lib/sportmonks/dto";
+import { SportMonksResponseSchema } from "@/lib/sportmonks/schemas";
 import { withRateLimit } from "@/lib/rateLimit/middleware";
 
 const QuerySchema = z.object({
-  countryId: z.string().optional(),
   locale: z.string().optional(),
 });
 
 /**
- * GET /api/sm/leagues?countryId=123&locale=en
- * Fetch leagues from SportMonks API (1-5 min cache)
+ * GET /api/sm/odds/bookmakers?locale=en
+ * Fetch bookmakers from SportMonks API (24h cache)
  */
 async function handler(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const query = QuerySchema.parse({
-      countryId: searchParams.get("countryId") || undefined,
       locale: searchParams.get("locale") || undefined,
     });
 
-    const countryId = query.countryId ? Number(query.countryId) : undefined;
-    const response = await sportmonksClient.getLeagues(countryId, query.locale);
+    const response = await sportmonksClient.getBookmakers(query.locale);
     const validated = SportMonksResponseSchema.parse(response);
-    const leagues = (validated.data as unknown[]).map((item) =>
-      SportMonksLeagueSchema.parse(item)
-    );
-    const normalized = normalizeLeagues(leagues);
 
-    return NextResponse.json(normalized);
+    return NextResponse.json(validated.data);
   } catch (error) {
-    console.error("Error fetching leagues:", error);
+    console.error("Error fetching bookmakers:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid query parameters", details: error.errors },
@@ -50,10 +39,11 @@ async function handler(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: "Failed to fetch leagues" },
+      { error: "Failed to fetch bookmakers" },
       { status: 500 }
     );
   }
 }
 
 export const GET = withRateLimit(handler);
+

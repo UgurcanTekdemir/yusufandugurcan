@@ -17,6 +17,11 @@ export const marketsWhitelist = [
 export type MarketType = (typeof marketsWhitelist)[number];
 
 /**
+ * Bookmaker IDs
+ */
+export const BET365_BOOKMAKER_ID = 2;
+
+/**
  * Bookmaker configuration
  */
 export interface BookmakerConfig {
@@ -40,6 +45,34 @@ export const bookmakerConfig: BookmakerConfig[] = [
       requests: 100,
       window: 60000, // 1 minute
     },
-    selectedBookmakerId: null, // Use first available bookmaker if null
+    selectedBookmakerId: BET365_BOOKMAKER_ID.toString(), // Use bet365 as default
   },
 ];
+
+/**
+ * Top Football Leagues
+ * Common SportMonks league IDs (may vary by season)
+ */
+export const TOP_LEAGUES = [
+  { id: 8, name: "Premier League", country: "England" },
+  { id: 564, name: "La Liga", country: "Spain" },
+  { id: 135, name: "Serie A", country: "Italy" },
+  { id: 39, name: "Bundesliga", country: "Germany" },
+  { id: 301, name: "Ligue 1", country: "France" },
+] as const;
+
+/**
+ * League filter groups
+ */
+export const LEAGUE_FILTERS = {
+  "top-leagues": "Top Leagues",
+  "united-kingdom": "United Kingdom",
+  "italy": "Italy",
+  "spain": "Spain",
+  "germany": "Germany",
+  "france": "France",
+  "internationals": "Internationals",
+  "europe": "Europe",
+} as const;
+
+export type LeagueFilterKey = keyof typeof LEAGUE_FILTERS;

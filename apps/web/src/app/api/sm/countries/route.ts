@@ -1,19 +1,23 @@
 import "server-only";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { sportmonksClient } from "@/lib/sportmonks/client";
 import {
   SportMonksCountrySchema,
   SportMonksResponseSchema,
 } from "@/lib/sportmonks/schemas";
 import { normalizeCountries } from "@/lib/sportmonks/dto";
+import { withRateLimit } from "@/lib/rateLimit/middleware";
 
 /**
- * GET /api/sm/countries
- * Fetch all countries from SportMonks API
+ * GET /api/sm/countries?locale=en
+ * Fetch countries from SportMonks API (24h cache)
  */
-export async function GET() {
+async function handler(request: NextRequest): Promise<NextResponse> {
   try {
-    const response = await sportmonksClient.getCountries();
+    const searchParams = request.nextUrl.searchParams;
+    const locale = searchParams.get("locale") || undefined;
+
+    const response = await sportmonksClient.getCountries(locale);
     const validated = SportMonksResponseSchema.parse(response);
     const countries = (validated.data as unknown[]).map((item) =>
       SportMonksCountrySchema.parse(item)
@@ -36,3 +40,4 @@ export async function GET() {
   }
 }
 
+export const GET = withRateLimit(handler);

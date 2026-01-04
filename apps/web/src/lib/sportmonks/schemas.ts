@@ -12,8 +12,8 @@ export const SportMonksCountrySchema = z
   .object({
     id: z.number(),
     name: z.string(),
-    code: z.string().optional(),
-    image_path: z.string().optional(),
+    code: z.string().nullable().optional(),
+    image_path: z.string().nullable().optional(),
   })
   .passthrough();
 
@@ -27,13 +27,13 @@ export const SportMonksLeagueSchema = z
     id: z.number(),
     name: z.string(),
     country_id: z.number().optional(),
-    type: z.string().optional(),
-    image_path: z.string().optional(),
+    type: z.string().nullable().optional(),
+    image_path: z.string().nullable().optional(),
     country: z
       .object({
         id: z.number(),
         name: z.string(),
-        code: z.string().optional(),
+        code: z.string().nullable().optional(),
       })
       .optional(),
   })
@@ -47,9 +47,9 @@ export type SportMonksLeague = z.infer<typeof SportMonksLeagueSchema>;
 export const SportMonksSeasonSchema = z
   .object({
     id: z.number(),
-    name: z.string().optional(),
+    name: z.string().nullable().optional(),
     league_id: z.number().optional(),
-    starting_at: z.string().optional(),
+    starting_at: z.string().nullable().optional(),
     ending_at: z.string().optional(),
     is_current: z.number().optional(),
   })
@@ -63,7 +63,7 @@ export type SportMonksSeason = z.infer<typeof SportMonksSeasonSchema>;
 export const SportMonksStageSchema = z
   .object({
     id: z.number(),
-    name: z.string(),
+    name: z.string().nullable().optional(),
     season_id: z.number().optional(),
     type: z.string().optional(),
   })
@@ -77,9 +77,11 @@ export type SportMonksStage = z.infer<typeof SportMonksStageSchema>;
 export const SportMonksRoundSchema = z
   .object({
     id: z.number(),
-    name: z.string(),
+    name: z.string().nullable().optional(),
     stage_id: z.number().optional(),
-    starting_at: z.string().optional(),
+    starting_at: z.string().nullable().optional(),
+    leg: z.string().nullable().optional(),
+    length: z.number().nullable().optional(),
   })
   .passthrough();
 
@@ -96,22 +98,30 @@ export const SportMonksTeamSchema = z
   .passthrough();
 
 /**
+ * SportMonks Score schema
+ */
+export const SportMonksScoreSchema = z
+  .object({
+    id: z.number(),
+    participant_id: z.number().optional(),
+    score: z.string().optional(),
+    description: z.string().optional(), // "CURRENT", "FT", "HT", etc.
+  })
+  .passthrough();
+
+export type SportMonksScore = z.infer<typeof SportMonksScoreSchema>;
+
+/**
  * SportMonks Fixture schema
  */
 export const SportMonksFixtureSchema = z
   .object({
     id: z.number(),
-    name: z.string().optional(),
-    starting_at: z.string().optional(),
-    result_info: z.string().optional(),
+    name: z.string().nullable().optional(),
+    starting_at: z.string().nullable().optional(),
+    result_info: z.string().nullable().optional(),
     state: z.string().optional(),
-    scores: z
-      .object({
-        score: z.string().optional(),
-        home_score: z.number().optional(),
-        away_score: z.number().optional(),
-      })
-      .optional(),
+    scores: z.array(SportMonksScoreSchema).optional(),
     participants: z
       .array(
         z.object({
@@ -150,6 +160,8 @@ export const SportMonksSelectionSchema = z
     name: z.string(),
     odds: z.number().optional(),
     value: z.string().optional(),
+    stopped: z.boolean().optional(),
+    suspended: z.boolean().optional(),
   })
   .passthrough();
 

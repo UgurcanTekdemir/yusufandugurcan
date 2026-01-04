@@ -7,25 +7,27 @@ import {
   SportMonksResponseSchema,
 } from "@/lib/sportmonks/schemas";
 import { normalizeStages } from "@/lib/sportmonks/dto";
+import { withRateLimit } from "@/lib/rateLimit/middleware";
 
 const QuerySchema = z.object({
-  seasonId: z.string().min(1),
+  seasonId: z.string().optional(),
+  locale: z.string().optional(),
 });
 
 /**
- * GET /api/sm/stages?seasonId=123
- * Fetch stages for a season
+ * GET /api/sm/stages?seasonId=123&locale=en
+ * Fetch stages from SportMonks API (1-5 min cache)
  */
-export async function GET(request: NextRequest) {
+async function handler(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const query = QuerySchema.parse({
-      seasonId: searchParams.get("seasonId"),
+      seasonId: searchParams.get("seasonId") || undefined,
+      locale: searchParams.get("locale") || undefined,
     });
 
-    const response = await sportmonksClient.getStages(
-      Number(query.seasonId)
-    );
+    const seasonId = query.seasonId ? Number(query.seasonId) : undefined;
+    const response = await sportmonksClient.getStages(seasonId, query.locale);
     const validated = SportMonksResponseSchema.parse(response);
     const stages = (validated.data as unknown[]).map((item) =>
       SportMonksStageSchema.parse(item)
@@ -54,3 +56,4 @@ export async function GET(request: NextRequest) {
   }
 }
 
+export const GET = withRateLimit(handler);

@@ -8,7 +8,7 @@ import type {
   SeasonDTO,
   StageDTO,
 } from "@repo/shared/types";
-import { marketsWhitelist, bookmakerConfig } from "@repo/shared/constants";
+import { marketsWhitelist, BET365_BOOKMAKER_ID } from "@repo/shared/constants";
 import type {
   SportMonksCountry,
   SportMonksFixture,
@@ -100,12 +100,34 @@ export function normalizeFixture(fixture: SportMonksFixture): FixtureDTO {
     "";
 
   const isLive = fixture.state === "LIVE" || fixture.state === "LIVE-HT";
-  const score = fixture.scores
-    ? {
-        home: fixture.scores.home_score || 0,
-        away: fixture.scores.away_score || 0,
+  
+  // Parse scores: filter by description === "CURRENT" and match by participant_id
+  let score: { home: number; away: number } | undefined = undefined;
+  if (fixture.scores && Array.isArray(fixture.scores)) {
+    const currentScores = fixture.scores.filter((s) => s.description === "CURRENT");
+    if (currentScores.length > 0) {
+      const homeParticipant = participants.find((p) => p.meta?.location === "home");
+      const awayParticipant = participants.find((p) => p.meta?.location === "away");
+      
+      const homeScore = homeParticipant
+        ? currentScores.find((s) => s.participant_id === homeParticipant.id)?.score
+        : undefined;
+      const awayScore = awayParticipant
+        ? currentScores.find((s) => s.participant_id === awayParticipant.id)?.score
+        : undefined;
+      
+      // Parse score strings (e.g., "2", "3") to numbers
+      const homeScoreNum = homeScore ? parseInt(homeScore, 10) : undefined;
+      const awayScoreNum = awayScore ? parseInt(awayScore, 10) : undefined;
+      
+      if (homeScoreNum !== undefined && awayScoreNum !== undefined && !isNaN(homeScoreNum) && !isNaN(awayScoreNum)) {
+        score = {
+          home: homeScoreNum,
+          away: awayScoreNum,
+        };
       }
-    : undefined;
+    }
+  }
 
   return {
     fixtureId: fixture.id,
@@ -156,22 +178,15 @@ function mapMarketName(sportMonksMarketName: string): string | null {
 }
 
 /**
- * Get selected bookmaker ID from config
- */
-function getSelectedBookmakerId(): string | number | null {
-  const config = bookmakerConfig.find((c) => c.id === "sportmonks");
-  return config?.selectedBookmakerId || null;
-}
-
-/**
  * Normalize SportMonks odds to OddsDTO
+ * Filters to bet365 bookmaker (ID=2) and market whitelist
  */
-export function normalizeOdds(odds: SportMonksOdds): OddsDTO {
+export function normalizeOdds(odds: SportMonksOdds, bookmakerId?: number | string): OddsDTO {
   const fixtureId = odds.fixture_id;
   const markets: OddsDTO["markets"] = [];
 
-  // Get selected bookmaker ID (or use first available)
-  const selectedBookmakerId = getSelectedBookmakerId();
+  // Use provided bookmakerId or default to bet365
+  const targetBookmakerId = bookmakerId ?? BET365_BOOKMAKER_ID;
 
   // Filter markets by whitelist
   const oddsMarkets = odds.markets || [];
@@ -188,10 +203,20 @@ export function normalizeOdds(odds: SportMonksOdds): OddsDTO {
         continue;
       }
 
+      // Note: When using bookmaker-specific endpoints (e.g., /bookmakers/{id}),
+      // SportMonks already filters by bookmaker, so we don't need to filter here.
+      // The bookmakerId parameter is used for logging/clarity but the API response
+      // already contains only the requested bookmaker's odds.
+      
+      // Include stopped/suspended flags for UI disabled state
+      // Markets array is already grouped by market_id from SportMonks API
+
       markets.push({
         market: marketName,
         selection: selection.name || selection.value || "",
         odds: selection.odds,
+        stopped: selection.stopped ?? false,
+        suspended: selection.suspended ?? false,
       });
     }
   }
