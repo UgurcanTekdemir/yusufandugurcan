@@ -1,0 +1,109 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to get user role from token
+    function getUserRole() {
+      return request.auth.token.role;
+    }
+    
+    // Helper function to get user dealerId from token
+    function getUserDealerId() {
+      return request.auth.token.dealerId;
+    }
+    
+    // Helper function to check if user is superadmin
+    function isSuperadmin() {
+      return getUserRole() == 'superadmin';
+    }
+    
+    // Helper function to check if user is dealer
+    function isDealer() {
+      return getUserRole() == 'dealer';
+    }
+    
+    // Helper function to check if user is regular user
+    function isUser() {
+      return getUserRole() == 'user';
+    }
+    
+    // Helper function to check if dealerId matches
+    function matchesDealerId(dealerId) {
+      return isSuperadmin() || getUserDealerId() == dealerId;
+    }
+    
+    // Users collection
+    match /users/{uid} {
+      // Users can read their own document
+      allow read: if request.auth != null && (request.auth.uid == uid || isSuperadmin() || (isDealer() && matchesDealerId(resource.data.dealerId)));
+      
+      // Only superadmin can create/update users
+      allow create: if isSuperadmin() && request.resource.data.keys().hasAll(['role', 'status', 'createdAt']);
+      
+      // Superadmin can update any user, dealers can update their own scoped users
+      allow update: if isSuperadmin() || (isDealer() && matchesDealerId(resource.data.get('dealerId', '')));
+      
+      // Only superadmin can delete users
+      allow delete: if isSuperadmin();
+    }
+    
+    // Dealers collection
+    match /dealers/{dealerId} {
+      // Superadmin can read all, dealers can read their own
+      allow read: if isSuperadmin() || (isDealer() && matchesDealerId(dealerId));
+      
+      // Only superadmin can create dealers
+      allow create: if isSuperadmin() && request.resource.data.keys().hasAll(['name', 'createdAt', 'createdBy']);
+      
+      // Only superadmin can update dealers
+      allow update: if isSuperadmin();
+      
+      // Only superadmin can delete dealers
+      allow delete: if isSuperadmin();
+    }
+    
+    // Transactions collection
+    match /transactions/{txId} {
+      // Users can read their own transactions (fromUid or toUid matches)
+      // Dealers can read transactions scoped by dealerId
+      // Superadmin can read all
+      allow read: if isSuperadmin() 
+        || (request.auth != null && (request.auth.uid == resource.data.fromUid || request.auth.uid == resource.data.toUid))
+        || (isDealer() && matchesDealerId(resource.data.dealerId));
+      
+      // Only dealers and superadmin can create transactions
+      allow create: if (isDealer() || isSuperadmin()) 
+        && request.resource.data.keys().hasAll(['type', 'amount', 'fromUid', 'toUid', 'dealerId', 'createdAt', 'reason'])
+        && (isSuperadmin() || matchesDealerId(request.resource.data.dealerId));
+      
+      // Only dealers and superadmin can update transactions (scoped by dealerId)
+      allow update: if isSuperadmin() || (isDealer() && matchesDealerId(resource.data.dealerId));
+      
+      // Only superadmin can delete transactions
+      allow delete: if isSuperadmin();
+    }
+    
+    // Slips collection
+    match /slips/{slipId} {
+      // Users can read their own slips
+      // Dealers can read slips scoped by dealerId
+      // Superadmin can read all
+      allow read: if isSuperadmin()
+        || (request.auth != null && request.auth.uid == resource.data.userId)
+        || (isDealer() && matchesDealerId(resource.data.dealerId));
+      
+      // Users, dealers, and superadmin can create slips
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll(['userId', 'dealerId', 'status', 'stake', 'potentialReturn', 'lines', 'oddsSnapshot', 'createdAt'])
+        && (isSuperadmin() || matchesDealerId(request.resource.data.dealerId))
+        && (isSuperadmin() || isDealer() || request.auth.uid == request.resource.data.userId);
+      
+      // Dealers and superadmin can update slips (scoped by dealerId)
+      allow update: if isSuperadmin() || (isDealer() && matchesDealerId(resource.data.dealerId));
+      
+      // Only superadmin can delete slips
+      allow delete: if isSuperadmin();
+    }
+  }
+}

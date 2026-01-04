@@ -1,0 +1,2 @@
+export { FixturesList } from "./FixturesList";
+
