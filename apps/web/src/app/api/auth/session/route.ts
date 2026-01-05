@@ -45,8 +45,16 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error("Error creating session cookie:", error);
+    
+    // In development, provide more detailed error information
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const isDevelopment = process.env.NODE_ENV === "development";
+    
     return NextResponse.json(
-      { error: "Failed to create session" },
+      { 
+        error: "Failed to create session",
+        ...(isDevelopment && { details: errorMessage })
+      },
       { status: 401 }
     );
   }

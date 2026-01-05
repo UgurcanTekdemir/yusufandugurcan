@@ -14,6 +14,17 @@ export function initializeAdmin() {
 
   const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
+  // Debug: Log env variable status (without logging the actual value)
+  if (!serviceAccountKey) {
+    console.warn(
+      "[ADMIN SDK] FIREBASE_SERVICE_ACCOUNT_KEY: MISSING (process.env.FIREBASE_SERVICE_ACCOUNT_KEY is undefined)"
+    );
+  } else {
+    console.log(
+      `[ADMIN SDK] FIREBASE_SERVICE_ACCOUNT_KEY: OK (length: ${serviceAccountKey.length})`
+    );
+  }
+
   // In development, allow running without service account key for frontend-only testing
   if (!serviceAccountKey) {
     if (process.env.NODE_ENV === "production") {
