@@ -7,27 +7,25 @@ import {
   SportMonksResponseSchema,
 } from "@/lib/sportmonks/schemas";
 import { normalizeLeagues } from "@/lib/sportmonks/dto";
-import { withRateLimit } from "@/lib/rateLimit/middleware";
 
 const QuerySchema = z.object({
-  countryId: z.string().optional(),
-  locale: z.string().optional(),
+  countryId: z.string().min(1),
 });
 
 /**
- * GET /api/sm/leagues?countryId=123&locale=en
- * Fetch leagues from SportMonks API (1-5 min cache)
+ * GET /api/sm/leagues?countryId=123
+ * Fetch leagues for a country
  */
-async function handler(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const query = QuerySchema.parse({
-      countryId: searchParams.get("countryId") || undefined,
-      locale: searchParams.get("locale") || undefined,
+      countryId: searchParams.get("countryId"),
     });
 
-    const countryId = query.countryId ? Number(query.countryId) : undefined;
-    const response = await sportmonksClient.getLeagues(countryId, query.locale);
+    const response = await sportmonksClient.getLeagues(
+      Number(query.countryId)
+    );
     const validated = SportMonksResponseSchema.parse(response);
     const leagues = (validated.data as unknown[]).map((item) =>
       SportMonksLeagueSchema.parse(item)
@@ -56,4 +54,3 @@ async function handler(request: NextRequest) {
   }
 }
 
-export const GET = withRateLimit(handler);

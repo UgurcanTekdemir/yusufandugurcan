@@ -7,41 +7,28 @@ import {
   SportMonksResponseSchema,
 } from "@/lib/sportmonks/schemas";
 import { normalizeFixtures } from "@/lib/sportmonks/dto";
-import { withRateLimit } from "@/lib/rateLimit/middleware";
 
 const QuerySchema = z.object({
-  leagueId: z.string().optional(),
+  leagueId: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  locale: z.string().optional(),
 });
 
 /**
- * GET /api/sm/fixtures?leagueId=123&date=2024-01-01&locale=en
- * GET /api/sm/fixtures?startDate=2024-01-01&endDate=2024-01-03&locale=en
- * Fetch fixtures from SportMonks API (1-5 min cache)
+ * GET /api/sm/fixtures?leagueId=123&date=2024-01-01
+ * Fetch fixtures for a league/date
  */
-async function handler(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const query = QuerySchema.parse({
-      leagueId: searchParams.get("leagueId") || undefined,
-      date: searchParams.get("date") || undefined,
-      startDate: searchParams.get("startDate") || undefined,
-      endDate: searchParams.get("endDate") || undefined,
-      locale: searchParams.get("locale") || undefined,
+      leagueId: searchParams.get("leagueId"),
+      date: searchParams.get("date"),
     });
 
-    const options = {
-      leagueId: query.leagueId ? Number(query.leagueId) : undefined,
-      date: query.date,
-      startDate: query.startDate,
-      endDate: query.endDate,
-      locale: query.locale,
-    };
-
-    const response = await sportmonksClient.getFixtures(options);
+    const response = await sportmonksClient.getFixtures(
+      Number(query.leagueId),
+      query.date
+    );
     const validated = SportMonksResponseSchema.parse(response);
     const fixtures = (validated.data as unknown[]).map((item) =>
       SportMonksFixtureSchema.parse(item)
@@ -70,4 +57,3 @@ async function handler(request: NextRequest) {
   }
 }
 
-export const GET = withRateLimit(handler);

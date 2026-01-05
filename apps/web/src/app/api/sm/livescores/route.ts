@@ -1,45 +1,23 @@
 import "server-only";
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import { NextResponse } from "next/server";
 import { sportmonksClient } from "@/lib/sportmonks/client";
 import {
   SportMonksFixtureSchema,
   SportMonksResponseSchema,
 } from "@/lib/sportmonks/schemas";
 import { normalizeFixtures } from "@/lib/sportmonks/dto";
-import { withRateLimit } from "@/lib/rateLimit/middleware";
-
-const QuerySchema = z.object({
-  locale: z.string().optional(),
-});
 
 /**
- * GET /api/sm/livescores?locale=en
- * Fetch live scores from SportMonks API (10-30s cache)
+ * GET /api/sm/livescores
+ * Fetch live scores from SportMonks API
  */
-async function handler(request: NextRequest) {
+export async function GET() {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const query = QuerySchema.parse({
-      locale: searchParams.get("locale") || undefined,
-    });
-
-    const response = await sportmonksClient.getLivescoresInplay(query.locale);
+    const response = await sportmonksClient.getLivescores();
     const validated = SportMonksResponseSchema.parse(response);
-    const fixtures = (validated.data as unknown[]).map((item) => {
-      try {
-        return SportMonksFixtureSchema.parse(item);
-      } catch (parseError) {
-        // Log raw item for debugging nullable fields
-        if (parseError instanceof z.ZodError) {
-          console.warn("Fixture validation error (nullable fields now supported):", {
-            item: JSON.stringify(item),
-            errors: parseError.errors,
-          });
-        }
-        throw parseError;
-      }
-    });
+    const fixtures = (validated.data as unknown[]).map((item) =>
+      SportMonksFixtureSchema.parse(item)
+    );
     const normalized = normalizeFixtures(fixtures);
 
     // Filter to only live fixtures (should already be filtered by API, but ensure isLive=true)
@@ -48,12 +26,6 @@ async function handler(request: NextRequest) {
     return NextResponse.json(liveFixtures);
   } catch (error) {
     console.error("Error fetching livescores:", error);
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Invalid query parameters", details: error.errors },
-        { status: 400 }
-      );
-    }
     if (error instanceof Error) {
       return NextResponse.json(
         { error: error.message },
@@ -67,4 +39,3 @@ async function handler(request: NextRequest) {
   }
 }
 
-export const GET = withRateLimit(handler);

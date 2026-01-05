@@ -7,36 +7,28 @@ import {
   SportMonksSingleResponseSchema,
 } from "@/lib/sportmonks/schemas";
 import { normalizeOdds } from "@/lib/sportmonks/dto";
-import { BET365_BOOKMAKER_ID } from "@repo/shared/constants";
-import { withRateLimit } from "@/lib/rateLimit/middleware";
 
 const QuerySchema = z.object({
   fixtureId: z.string().min(1),
-  bookmakerId: z.string().optional(),
-  locale: z.string().optional(),
 });
 
 /**
- * GET /api/sm/odds/prematch?fixtureId=123&bookmakerId=2&locale=en
- * Fetch prematch odds for a fixture with bookmaker filter (30-120s cache)
- * Uses bet365 (ID=2) by default
+ * GET /api/sm/odds/prematch?fixtureId=123
+ * Fetch prematch odds for a fixture
  */
-async function handler(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const query = QuerySchema.parse({
       fixtureId: searchParams.get("fixtureId"),
-      bookmakerId: searchParams.get("bookmakerId") || undefined,
-      locale: searchParams.get("locale") || undefined,
     });
 
-    const fixtureId = Number(query.fixtureId);
-    const bookmakerId = query.bookmakerId ? Number(query.bookmakerId) : BET365_BOOKMAKER_ID;
-
-    const response = await sportmonksClient.getPrematchOddsByFixture(fixtureId, bookmakerId, query.locale);
+    const response = await sportmonksClient.getPrematchOdds(
+      Number(query.fixtureId)
+    );
     const validated = SportMonksSingleResponseSchema.parse(response);
     const odds = SportMonksOddsSchema.parse(validated.data);
-    const normalized = normalizeOdds(odds, bookmakerId);
+    const normalized = normalizeOdds(odds);
 
     return NextResponse.json(normalized);
   } catch (error) {
@@ -60,4 +52,3 @@ async function handler(request: NextRequest) {
   }
 }
 
-export const GET = withRateLimit(handler);

@@ -6,9 +6,6 @@ import { Toaster } from "react-hot-toast";
 export const metadata: Metadata = {
   title: "Yusuf and Dugurcan",
   description: "Next.js App",
-  icons: {
-    icon: "/favicon.ico",
-  },
 };
 
 export default function RootLayout({
@@ -17,8 +14,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body suppressHydrationWarning>
+    <html lang="en">
+      <body>
         <QueryProvider>
           {children}
           <Toaster

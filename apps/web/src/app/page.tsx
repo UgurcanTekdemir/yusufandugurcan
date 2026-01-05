@@ -2,21 +2,16 @@
 
 import Link from "next/link";
 import { Calendar } from "lucide-react";
-import { TopLeaguesFixtures } from "@/components/TopLeaguesFixtures";
-import { FootballSidebar } from "@/components/FootballSidebar";
+import { FixturesList } from "@/components/FixturesList";
 import { useSearchParams } from "next/navigation";
 
 export default function HomePage() {
   const searchParams = useSearchParams();
+  const leagueId = searchParams.get("leagueId") || undefined;
   const date = searchParams.get("date") || new Date().toISOString().split("T")[0];
 
   return (
-    <div className="min-h-screen bg-dark-bg flex">
-      {/* Fixed Sidebar */}
-      <FootballSidebar />
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 ml-[240px]">
+    <div className="min-h-screen bg-dark-bg flex flex-col">
       {/* Header */}
       <header className="h-[60px] bg-[#121212] border-b border-[#2a2a2a] flex items-center justify-between px-4 sticky top-0 z-50 shadow-md">
         <div className="flex items-center gap-4">
@@ -102,11 +97,10 @@ export default function HomePage() {
         </div>
       </div>
 
-        {/* Fixtures List */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          <TopLeaguesFixtures date={date} />
-          <div className="h-20"></div>
-        </div>
+      {/* Fixtures List */}
+      <div className="flex-1 overflow-y-auto">
+        <FixturesList leagueId={leagueId} date={date} />
+        <div className="h-20"></div>
       </div>
     </div>
   );

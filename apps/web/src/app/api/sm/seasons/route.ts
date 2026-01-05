@@ -7,27 +7,25 @@ import {
   SportMonksResponseSchema,
 } from "@/lib/sportmonks/schemas";
 import { normalizeSeasons } from "@/lib/sportmonks/dto";
-import { withRateLimit } from "@/lib/rateLimit/middleware";
 
 const QuerySchema = z.object({
-  leagueId: z.string().optional(),
-  locale: z.string().optional(),
+  leagueId: z.string().min(1),
 });
 
 /**
- * GET /api/sm/seasons?leagueId=123&locale=en
- * Fetch seasons from SportMonks API (1-5 min cache)
+ * GET /api/sm/seasons?leagueId=123
+ * Fetch seasons for a league
  */
-async function handler(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const query = QuerySchema.parse({
-      leagueId: searchParams.get("leagueId") || undefined,
-      locale: searchParams.get("locale") || undefined,
+      leagueId: searchParams.get("leagueId"),
     });
 
-    const leagueId = query.leagueId ? Number(query.leagueId) : undefined;
-    const response = await sportmonksClient.getSeasons(leagueId, query.locale);
+    const response = await sportmonksClient.getSeasons(
+      Number(query.leagueId)
+    );
     const validated = SportMonksResponseSchema.parse(response);
     const seasons = (validated.data as unknown[]).map((item) =>
       SportMonksSeasonSchema.parse(item)
@@ -56,4 +54,3 @@ async function handler(request: NextRequest) {
   }
 }
 
-export const GET = withRateLimit(handler);

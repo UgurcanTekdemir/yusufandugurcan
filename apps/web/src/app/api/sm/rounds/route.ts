@@ -7,30 +7,28 @@ import {
   SportMonksResponseSchema,
 } from "@/lib/sportmonks/schemas";
 import { normalizeRounds } from "@/lib/sportmonks/dto";
-import { withRateLimit } from "@/lib/rateLimit/middleware";
 
 const QuerySchema = z.object({
-  seasonId: z.string().optional(),
+  seasonId: z.string().min(1),
   stageId: z.string().optional(),
-  locale: z.string().optional(),
 });
 
 /**
- * GET /api/sm/rounds?seasonId=123&stageId=456&locale=en
- * Fetch rounds from SportMonks API (1-5 min cache)
+ * GET /api/sm/rounds?seasonId=123&stageId=456
+ * Fetch rounds for a season/stage
  */
-async function handler(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const query = QuerySchema.parse({
-      seasonId: searchParams.get("seasonId") || undefined,
-      stageId: searchParams.get("stageId") || undefined,
-      locale: searchParams.get("locale") || undefined,
+      seasonId: searchParams.get("seasonId"),
+      stageId: searchParams.get("stageId"),
     });
 
-    const seasonId = query.seasonId ? Number(query.seasonId) : undefined;
-    const stageId = query.stageId ? Number(query.stageId) : undefined;
-    const response = await sportmonksClient.getRounds(seasonId, stageId, query.locale);
+    const response = await sportmonksClient.getRounds(
+      Number(query.seasonId),
+      query.stageId ? Number(query.stageId) : undefined
+    );
     const validated = SportMonksResponseSchema.parse(response);
     const rounds = (validated.data as unknown[]).map((item) =>
       SportMonksRoundSchema.parse(item)
@@ -59,4 +57,3 @@ async function handler(request: NextRequest) {
   }
 }
 
-export const GET = withRateLimit(handler);

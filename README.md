@@ -133,34 +133,10 @@ Shared tooling configurations:
 Copy the example environment file and configure:
 
 ```bash
-cp apps/web/.env.example apps/web/.env.local
+cp apps/web/.env.example apps/web/.env
 ```
 
-Edit `apps/web/.env.local` with your actual values.
-
-### Required Environment Variables
-
-- **Firebase**: `NEXT_PUBLIC_FIREBASE_*` for client SDK, `FIREBASE_SERVICE_ACCOUNT_KEY` for admin SDK
-- **SportMonks**: `SPORTMONKS_TOKEN` - Your SportMonks API token
-- **Upstash Redis**: `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` - Upstash Redis credentials
-
-### Upstash Redis Setup
-
-1. Create an account at [Upstash](https://upstash.com/)
-2. Create a new Redis database
-3. Copy the REST URL and REST Token from the database dashboard
-4. Add them to your `.env.local` file:
-   ```
-   UPSTASH_REDIS_REST_URL=https://your-redis-url.upstash.io
-   UPSTASH_REDIS_REST_TOKEN=your-redis-token
-   ```
-
-Cache and rate limiting configuration (optional, defaults provided):
-- `CACHE_PREFIX=sm:` - Cache key prefix
-- `CACHE_VERSION_KEY=sm:cache_version` - Cache version key
-- `RATE_LIMIT_PREFIX=rl:` - Rate limit key prefix
-- `RATE_LIMIT_WINDOW_SECONDS=60` - Rate limit window in seconds
-- `RATE_LIMIT_MAX_REQUESTS=120` - Maximum requests per window
+Edit `apps/web/.env` with your actual values.
 
 ## Firebase Emulator
 

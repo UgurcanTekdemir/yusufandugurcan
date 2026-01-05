@@ -1,2 +1,0 @@
-export { FootballSidebar } from "./FootballSidebar";
-

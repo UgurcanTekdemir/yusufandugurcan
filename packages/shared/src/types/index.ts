@@ -102,8 +102,6 @@ export interface MarketOdds {
   market: string;
   selection: string;
   odds: number;
-  stopped?: boolean;
-  suspended?: boolean;
 }
 
 /**
