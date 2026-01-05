@@ -64,9 +64,10 @@ async function smGet(
     const body = await response.text();
 
     if (!response.ok) {
-      // Log upstream error with full details
+      // Log upstream error (sanitize URL to remove token)
+      const sanitizedUrl = url.toString().replace(/api_token=[^&]*/, "api_token=***");
       console.error(
-        `[SportMonks ERROR] ${response.status} ${response.statusText} - URL: ${url.toString()} - Body: ${body}`
+        `[SportMonks ERROR] ${response.status} ${response.statusText} - URL: ${sanitizedUrl} - Body: ${body}`
       );
       return { ok: false, status: response.status, body };
     }
@@ -193,8 +194,10 @@ export const sportmonksClient = {
       const body = await response.text();
       
       if (!response.ok) {
+        // Log upstream error (sanitize URL to remove token)
+        const sanitizedUrl = url.toString().replace(/api_token=[^&]*/, "api_token=***");
         console.error(
-          `[SportMonks ERROR] ${response.status} ${response.statusText} - URL: ${url.toString()} - Body: ${body}`
+          `[SportMonks ERROR] ${response.status} ${response.statusText} - URL: ${sanitizedUrl} - Body: ${body}`
         );
         throw new Error(`SportMonks ${response.status}: ${body}`);
       }
@@ -214,11 +217,11 @@ export const sportmonksClient = {
 
   /**
    * Fetch prematch odds for a fixture
-   * GET /odds/prematch/fixtures/{fixtureId}
+   * GET /odds/pre-match/fixtures/{fixtureId}
    * Note: This endpoint may require a specific SportMonks subscription tier
    */
   async getPrematchOdds(fixtureId: number): Promise<unknown> {
-    const result = await smGet(`/odds/prematch/fixtures/${fixtureId}`);
+    const result = await smGet(`/odds/pre-match/fixtures/${fixtureId}`);
     if (!result.ok) {
       throw new Error(`SportMonks ${result.status}: ${result.body}`);
     }
