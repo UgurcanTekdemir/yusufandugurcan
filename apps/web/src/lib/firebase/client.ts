@@ -4,41 +4,121 @@ import { initializeApp, getApps, FirebaseApp } from "firebase/app";
 import { getAuth, Auth, connectAuthEmulator } from "firebase/auth";
 import type { FirebaseOptions } from "firebase/app";
 
-// Firebase configuration - use dummy values if not set (for development)
+/**
+ * Check and log environment variable status
+ * Uses static process.env access (required for Next.js client bundle)
+ */
+function envOrUndefined(name: string, value: string | undefined): string | undefined {
+  const status = value ? "OK" : "MISSING";
+  console.log(`[ENV CHECK] ${name}: ${status}`);
+  return value;
+}
+
+// Build Firebase config with static process.env access (required for Next.js client bundle)
 const firebaseConfig: FirebaseOptions = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "dummy-api-key",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "dummy-project.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "dummy-project",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "dummy-project.appspot.com",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "123456789",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:123456789:web:dummy",
+  apiKey: envOrUndefined("NEXT_PUBLIC_FIREBASE_API_KEY", process.env.NEXT_PUBLIC_FIREBASE_API_KEY) || "",
+  authDomain: envOrUndefined("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN", process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN) || "",
+  projectId: envOrUndefined("NEXT_PUBLIC_FIREBASE_PROJECT_ID", process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) || "",
+  storageBucket: envOrUndefined("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET", process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) || "",
+  messagingSenderId: envOrUndefined("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID", process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID) || "",
+  appId: envOrUndefined("NEXT_PUBLIC_FIREBASE_APP_ID", process.env.NEXT_PUBLIC_FIREBASE_APP_ID) || "",
 };
 
-// Initialize Firebase app (singleton pattern)
-let firebaseApp: FirebaseApp;
+// Check if all required config values are present
+const requiredFields: Array<{ key: keyof FirebaseOptions; envName: string }> = [
+  { key: "apiKey", envName: "NEXT_PUBLIC_FIREBASE_API_KEY" },
+  { key: "authDomain", envName: "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN" },
+  { key: "projectId", envName: "NEXT_PUBLIC_FIREBASE_PROJECT_ID" },
+];
 
-if (getApps().length === 0) {
-  firebaseApp = initializeApp(firebaseConfig);
-} else {
-  firebaseApp = getApps()[0];
+function hasAllClientConfig(): boolean {
+  return requiredFields.every((field) => {
+    const value = firebaseConfig[field.key];
+    return value && value.trim() !== "";
+  });
 }
 
-// Initialize and export Auth instance
-// Note: This will fail if Firebase config is invalid, but allows development without real config
-export const auth: Auth = getAuth(firebaseApp);
+// Singleton storage
+let firebaseApp: FirebaseApp | null = null;
+let auth: Auth | null = null;
 
-// Connect to Auth emulator in development if enabled
-if (
-  process.env.NODE_ENV === "development" &&
-  process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST
-) {
-  try {
-    connectAuthEmulator(auth, process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST, {
-      disableWarnings: true,
-    });
-  } catch (error) {
-    // Emulator already connected, ignore error
+/**
+ * Get Firebase app instance (null if config is missing or window is undefined)
+ */
+function getFirebaseApp(): FirebaseApp | null {
+  // Client-side only
+  if (typeof window === "undefined") {
+    return null;
   }
+
+  // Check if config is complete
+  if (!hasAllClientConfig()) {
+    console.error(
+      "[FIREBASE] Missing required environment variables. Firebase will not be initialized. " +
+        "Add them to apps/web/.env.local: " +
+        requiredFields.map((f) => f.envName).join(", ")
+    );
+    return null;
+  }
+
+  // Return existing app if already initialized
+  if (firebaseApp) {
+    return firebaseApp;
+  }
+
+  // Initialize if not already initialized
+  if (getApps().length === 0) {
+    try {
+      firebaseApp = initializeApp(firebaseConfig);
+      console.log("[FIREBASE] Initialized successfully");
+    } catch (error) {
+      console.error("[FIREBASE] Failed to initialize Firebase:", error);
+      return null;
+    }
+  } else {
+    firebaseApp = getApps()[0]!;
+  }
+
+  return firebaseApp;
 }
 
-export { firebaseApp as app };
+/**
+ * Get Firebase Auth instance (null if app is null)
+ */
+function getFirebaseAuth(): Auth | null {
+  const app = getFirebaseApp();
+  if (!app) {
+    return null;
+  }
+
+  if (auth) {
+    return auth;
+  }
+
+  auth = getAuth(app);
+
+  // Optional: connect to Auth Emulator in development
+  if (process.env.NODE_ENV === "development") {
+    const host = process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST;
+    if (host) {
+      const url = host.startsWith("http") ? host : `http://${host}`;
+      try {
+        if (auth) {
+          connectAuthEmulator(auth, url, { disableWarnings: true });
+        }
+      } catch {
+        // already connected
+      }
+    }
+  }
+
+  return auth;
+}
+
+// Initialize on module load (client-side only)
+if (typeof window !== "undefined") {
+  firebaseApp = getFirebaseApp();
+  auth = getFirebaseAuth();
+}
+
+export { firebaseApp as app, auth };

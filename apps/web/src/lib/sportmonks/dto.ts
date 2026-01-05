@@ -3,6 +3,7 @@ import type {
   CountryDTO,
   FixtureDTO,
   LeagueDTO,
+  LiveFixtureDTO,
   OddsDTO,
   RoundDTO,
   SeasonDTO,
@@ -32,6 +33,8 @@ export function normalizeCountry(country: SportMonksCountry): CountryDTO {
     countryId: country.id,
     name: country.name,
     code: country.code,
+    continentId: country.continent_id,
+    flagUrl: country.image_path,
   };
 }
 
@@ -43,8 +46,10 @@ export function normalizeLeague(league: SportMonksLeague): LeagueDTO {
     leagueId: league.id,
     name: league.name,
     country: league.country?.name,
+    countryId: league.country_id,
     type: league.type,
     logo: league.image_path,
+    logoUrl: league.image_path,
   };
 }
 
@@ -107,14 +112,23 @@ export function normalizeFixture(fixture: SportMonksFixture): FixtureDTO {
       }
     : undefined;
 
+  // Extract league info from fixture (if included)
+  const leagueId = (fixture as unknown as { league_id?: number })?.league_id;
+  const leagueName = (fixture as unknown as { league?: { name?: string } })?.league?.name;
+
   return {
     fixtureId: fixture.id,
     teams: {
       home: homeTeam,
       away: awayTeam,
     },
+    homeTeam,
+    awayTeam,
     kickoffAt: fixture.starting_at || new Date().toISOString(),
+    leagueId,
+    leagueName,
     isLive,
+    hasOdds: undefined, // Will be determined by odds endpoint
     score,
   };
 }
@@ -229,5 +243,49 @@ export function normalizeRounds(rounds: SportMonksRound[]): RoundDTO[] {
 
 export function normalizeFixtures(fixtures: SportMonksFixture[]): FixtureDTO[] {
   return fixtures.map(normalizeFixture);
+}
+
+/**
+ * Normalize SportMonks live fixture to LiveFixtureDTO
+ */
+export function normalizeLiveFixture(fixture: SportMonksFixture): LiveFixtureDTO {
+  const participants = fixture.participants || [];
+  const homeTeam =
+    participants.find((p) => p.meta?.location === "home")?.name ||
+    participants[0]?.name ||
+    "";
+  const awayTeam =
+    participants.find((p) => p.meta?.location === "away")?.name ||
+    participants[1]?.name ||
+    "";
+
+  const score = fixture.scores
+    ? {
+        home: fixture.scores.home_score || 0,
+        away: fixture.scores.away_score || 0,
+      }
+    : undefined;
+
+  // Extract minute from fixture state or scores
+  const minute = (fixture as unknown as { minute?: number })?.minute;
+
+  // Extract league info
+  const leagueId = (fixture as unknown as { league_id?: number })?.league_id || 0;
+
+  return {
+    fixtureId: fixture.id,
+    homeTeam,
+    awayTeam,
+    leagueId,
+    minute,
+    score,
+  };
+}
+
+/**
+ * Normalize array of SportMonks live fixtures
+ */
+export function normalizeLiveFixtures(fixtures: SportMonksFixture[]): LiveFixtureDTO[] {
+  return fixtures.map(normalizeLiveFixture);
 }
 

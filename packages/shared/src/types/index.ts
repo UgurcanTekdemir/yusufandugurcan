@@ -90,8 +90,13 @@ export interface Score {
 export interface FixtureDTO {
   fixtureId: string | number;
   teams: TeamInfo;
+  homeTeam?: string;
+  awayTeam?: string;
   kickoffAt: Date | string;
+  leagueId?: string | number;
+  leagueName?: string;
   isLive: boolean;
+  hasOdds?: boolean;
   score?: Score;
 }
 
@@ -120,6 +125,8 @@ export interface CountryDTO {
   countryId: string | number;
   name: string;
   code?: string;
+  continentId?: string | number;
+  flagUrl?: string;
 }
 
 /**
@@ -129,8 +136,10 @@ export interface LeagueDTO {
   leagueId: string | number;
   name: string;
   country?: string;
+  countryId?: string | number;
   type?: string;
   logo?: string;
+  logoUrl?: string;
 }
 
 /**
@@ -152,6 +161,19 @@ export interface StageDTO {
   name: string;
   seasonId: string | number;
   type?: string;
+}
+
+/**
+ * Live Fixture DTO structure
+ * Extends FixtureDTO with live-specific fields
+ */
+export interface LiveFixtureDTO {
+  fixtureId: string | number;
+  homeTeam: string;
+  awayTeam: string;
+  leagueId: string | number;
+  minute?: number;
+  score?: Score;
 }
 
 /**

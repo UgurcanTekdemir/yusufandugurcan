@@ -130,13 +130,39 @@ Shared tooling configurations:
 
 ## Environment Variables
 
-Copy the example environment file and configure:
+Environment variables must be configured in `apps/web/.env.local` (this file is git-ignored).
 
-```bash
-cp apps/web/.env.example apps/web/.env
+### Location
+
+**Important**: The `.env.local` file must be located at `apps/web/.env.local` (next to `next.config.js`).
+
+When running `npm run dev` from the repo root, the script automatically changes directory to `apps/web` before starting Next.js, ensuring environment variables are loaded correctly. If you change environment variables, restart the dev server for changes to take effect.
+
+### Required Variables
+
+Create `apps/web/.env.local` with the following variables:
+
+```env
+# Firebase Web App Configuration (Client-side)
+NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+
+# Firebase Admin SDK (Server-side)
+FIREBASE_SERVICE_ACCOUNT_KEY={"type":"service_account",...}
+
+# SportMonks API
+SPORTMONKS_API_TOKEN=your_token
+
+# Upstash Redis (optional)
+UPSTASH_REDIS_REST_URL=your_url
+UPSTASH_REDIS_REST_TOKEN=your_token
 ```
 
-Edit `apps/web/.env` with your actual values.
+**Note**: Variables prefixed with `NEXT_PUBLIC_` are exposed to the browser. All other variables are server-only.
 
 ## Firebase Emulator
 

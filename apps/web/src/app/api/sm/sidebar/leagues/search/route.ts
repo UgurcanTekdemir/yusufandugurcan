@@ -9,22 +9,30 @@ import {
 import { normalizeLeagues } from "@/lib/sportmonks/dto";
 
 const QuerySchema = z.object({
-  countryId: z.string().min(1),
+  query: z.string().min(1, "Query is required"),
+  locale: z.string().optional(),
 });
 
 /**
- * GET /api/sm/leagues?countryId=123
- * Fetch leagues for a country
+ * GET /api/sm/sidebar/leagues/search?query=premier
+ * Search leagues
  */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const query = QuerySchema.parse({
-      countryId: searchParams.get("countryId"),
+    const queryParams = QuerySchema.parse({
+      query: searchParams.get("query"),
+      locale: searchParams.get("locale"),
     });
 
-    const response = await sportmonksClient.getLeaguesByCountryId(
-      Number(query.countryId)
+    const params: { locale?: string } = {};
+    if (queryParams.locale) {
+      params.locale = queryParams.locale;
+    }
+
+    const response = await sportmonksClient.searchLeagues(
+      queryParams.query,
+      Object.keys(params).length > 0 ? params : undefined
     );
     const validated = SportMonksResponseSchema.parse(response);
     const leagues = (validated.data as unknown[]).map((item) =>
@@ -34,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(normalized);
   } catch (error) {
-    console.error("Error fetching leagues:", error);
+    console.error("Error searching leagues:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid query parameters", details: error.errors },
@@ -48,7 +56,7 @@ export async function GET(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: "Failed to fetch leagues" },
+      { error: "Failed to search leagues" },
       { status: 500 }
     );
   }

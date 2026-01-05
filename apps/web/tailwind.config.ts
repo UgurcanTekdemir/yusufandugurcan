@@ -9,20 +9,34 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        "bet365": {
+          green: {
+            DEFAULT: "#067a3d",
+            dark: "#045a2e",
+            light: "#0a9d52",
+            hover: "#0a9d52",
+          },
+          bg: {
+            DEFAULT: "#1a1a1a",
+            surface: "#252525",
+            sidebar: "#2a2a2a",
+          },
+        },
         dark: {
-          bg: "#0b0b0f",
-          surface: "#15151a",
-          border: "#30363d",
-          hover: "#1f1f26",
+          bg: "#1a1a1a",
+          surface: "#252525",
+          border: "#333333",
+          hover: "#2a2a2a",
+          sidebar: "#2a2a2a",
         },
         text: {
-          primary: "#f0f6fc",
-          secondary: "#c9d1d9",
-          muted: "#8b949e",
+          primary: "#ffffff",
+          secondary: "#cccccc",
+          muted: "#999999",
         },
         accent: {
-          primary: "#00ffa3",
-          hover: "#00ce84",
+          primary: "#067a3d",
+          hover: "#0a9d52",
         },
         success: "#3fb950",
         warning: "#f0883e",

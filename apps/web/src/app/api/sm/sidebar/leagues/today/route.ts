@@ -9,23 +9,21 @@ import {
 import { normalizeLeagues } from "@/lib/sportmonks/dto";
 
 const QuerySchema = z.object({
-  countryId: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"),
 });
 
 /**
- * GET /api/sm/leagues?countryId=123
- * Fetch leagues for a country
+ * GET /api/sm/sidebar/leagues/today?date=2024-01-01
+ * Fetch leagues with matches today
  */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const query = QuerySchema.parse({
-      countryId: searchParams.get("countryId"),
+      date: searchParams.get("date"),
     });
 
-    const response = await sportmonksClient.getLeaguesByCountryId(
-      Number(query.countryId)
-    );
+    const response = await sportmonksClient.getLeaguesByDate(query.date);
     const validated = SportMonksResponseSchema.parse(response);
     const leagues = (validated.data as unknown[]).map((item) =>
       SportMonksLeagueSchema.parse(item)
@@ -34,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(normalized);
   } catch (error) {
-    console.error("Error fetching leagues:", error);
+    console.error("Error fetching today leagues:", error);
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid query parameters", details: error.errors },
@@ -48,7 +46,7 @@ export async function GET(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: "Failed to fetch leagues" },
+      { error: "Failed to fetch today leagues" },
       { status: 500 }
     );
   }

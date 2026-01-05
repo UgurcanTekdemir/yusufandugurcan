@@ -21,6 +21,12 @@ export function useAuth(): UseAuthReturn {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    if (!auth) {
+      console.warn("[useAuth] Firebase auth is not initialized. Check environment variables.");
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(
       auth,
       (user) => {

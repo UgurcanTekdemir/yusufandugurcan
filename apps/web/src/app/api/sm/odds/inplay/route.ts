@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const query = QuerySchema.parse({
-      fixtureId: searchParams.get("fixtureId"),
+      fixtureId: searchParams.get("fixtureId") ?? "",
     });
 
     const response = await sportmonksClient.getInplayOdds(
@@ -33,12 +33,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(normalized);
   } catch (error) {
     console.error("Error fetching in-play odds:", error);
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Invalid query parameters", details: error.errors },
         { status: 400 }
       );
     }
+
+    // Parse upstream error status if available
+    if (error instanceof Error && error.message.startsWith("SportMonks ")) {
+      const match = error.message.match(/SportMonks (\d+): (.+)/);
+      if (match) {
+        const status = parseInt(match[1]!, 10);
+        const body = match[2]!;
+        return NextResponse.json(
+          { error: `Upstream error: ${error.message}`, upstream: body },
+          { status }
+        );
+      }
+    }
+
     if (error instanceof Error) {
       return NextResponse.json(
         { error: error.message },

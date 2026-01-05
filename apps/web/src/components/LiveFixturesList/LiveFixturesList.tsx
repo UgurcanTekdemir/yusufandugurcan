@@ -2,7 +2,7 @@
 
 import { useState, memo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { FixtureDTO, OddsDTO, MarketOdds } from "@repo/shared/types";
+import type { LiveFixtureDTO, OddsDTO, MarketOdds } from "@repo/shared/types";
 import { Skeleton } from "../ui/Skeleton";
 import { useBetslipStore, type BetslipSelection } from "@/stores/betslipStore";
 import { getMarketLabel, getSelectionLabel } from "@/stores/betslipUtils";
@@ -15,7 +15,7 @@ function cn(...classes: (string | undefined)[]): string {
 }
 
 // Fetch live fixtures
-async function fetchLiveFixtures(): Promise<FixtureDTO[]> {
+async function fetchLiveFixtures(): Promise<LiveFixtureDTO[]> {
   const response = await fetch("/api/sm/livescores");
   if (!response.ok) {
     throw new Error("Failed to fetch live fixtures");
@@ -106,7 +106,7 @@ function getBTTSOdds(markets: MarketOdds[]): {
 }
 
 interface LiveFixtureRowProps {
-  fixture: FixtureDTO;
+  fixture: LiveFixtureDTO;
   isExpanded: boolean;
   onToggle: () => void;
   onAddSelection: (selection: BetslipSelection) => void;
@@ -147,17 +147,15 @@ const LiveFixtureRow = memo(function LiveFixtureRow({
       return;
     }
 
-    const kickoffAtStr = typeof fixture.kickoffAt === "string" 
-      ? fixture.kickoffAt 
-      : fixture.kickoffAt.toISOString();
+    const kickoffAtStr = new Date().toISOString();
 
     const selection: BetslipSelection = {
       fixtureId: fixture.fixtureId,
       marketKey,
       selectionKey,
       odds,
-      homeTeam: fixture.teams.home,
-      awayTeam: fixture.teams.away,
+      homeTeam: fixture.homeTeam,
+      awayTeam: fixture.awayTeam,
       kickoffAt: kickoffAtStr,
       marketLabel: getMarketLabel(marketKey),
       selectionLabel: getSelectionLabel(selectionKey, marketKey),
@@ -189,7 +187,7 @@ const LiveFixtureRow = memo(function LiveFixtureRow({
           </div>
           <div className="flex flex-col gap-1 mt-1">
             <div className="flex justify-between items-center">
-              <span className="text-text-primary font-medium">{fixture.teams.home}</span>
+              <span className="text-text-primary font-medium">{fixture.homeTeam}</span>
               {score && (
                 <span className="text-accent-primary font-bold text-lg">
                   {fixture.score?.home}
@@ -197,7 +195,7 @@ const LiveFixtureRow = memo(function LiveFixtureRow({
               )}
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-text-primary font-medium">{fixture.teams.away}</span>
+              <span className="text-text-primary font-medium">{fixture.awayTeam}</span>
               {score && (
                 <span className="text-accent-primary font-bold text-lg">
                   {fixture.score?.away}
@@ -380,7 +378,7 @@ export function LiveFixturesList() {
     isLoading,
     isError,
     error,
-  } = useQuery<FixtureDTO[], Error>({
+  } = useQuery<LiveFixtureDTO[], Error>({
     queryKey: ["livescores"],
     queryFn: fetchLiveFixtures,
     refetchInterval: 7 * 1000, // Poll every 7 seconds

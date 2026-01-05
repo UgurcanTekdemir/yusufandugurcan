@@ -1,5 +1,5 @@
 import "server-only";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { sportmonksClient } from "@/lib/sportmonks/client";
 import {
   SportMonksCountrySchema,
@@ -10,10 +10,25 @@ import { normalizeCountries } from "@/lib/sportmonks/dto";
 /**
  * GET /api/sm/countries
  * Fetch all countries from SportMonks API
+ * Updated to use new client methods with query params support
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const response = await sportmonksClient.getCountries();
+    const searchParams = request.nextUrl.searchParams;
+    const page = searchParams.get("page");
+    const locale = searchParams.get("locale");
+
+    const params: { page?: number; locale?: string } = {};
+    if (page) {
+      params.page = Number(page);
+    }
+    if (locale) {
+      params.locale = locale;
+    }
+
+    const response = await sportmonksClient.getCountries(
+      Object.keys(params).length > 0 ? params : undefined
+    );
     const validated = SportMonksResponseSchema.parse(response);
     const countries = (validated.data as unknown[]).map((item) =>
       SportMonksCountrySchema.parse(item)

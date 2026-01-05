@@ -3,33 +3,41 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { sportmonksClient } from "@/lib/sportmonks/client";
 import {
-  SportMonksFixtureSchema,
+  SportMonksCountrySchema,
   SportMonksResponseSchema,
 } from "@/lib/sportmonks/schemas";
-import { normalizeLiveFixtures } from "@/lib/sportmonks/dto";
+import { normalizeCountries } from "@/lib/sportmonks/dto";
 
 /**
- * GET /api/sm/livescores
- * Fetch live scores from SportMonks API
- * Uses /livescores/inplay endpoint
+ * GET /api/sm/sidebar/countries
+ * Fetch all countries from SportMonks API
  */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const include = searchParams.get("include") || "participants";
+    const page = searchParams.get("page");
+    const locale = searchParams.get("locale");
 
-    const params: { include?: string } = { include };
+    const params: { page?: number; locale?: string } = {};
+    if (page) {
+      params.page = Number(page);
+    }
+    if (locale) {
+      params.locale = locale;
+    }
 
-    const response = await sportmonksClient.getLivescoresInplay(params);
-    const validated = SportMonksResponseSchema.parse(response);
-    const fixtures = (validated.data as unknown[]).map((item) =>
-      SportMonksFixtureSchema.parse(item)
+    const response = await sportmonksClient.getCountries(
+      Object.keys(params).length > 0 ? params : undefined
     );
-    const normalized = normalizeLiveFixtures(fixtures);
+    const validated = SportMonksResponseSchema.parse(response);
+    const countries = (validated.data as unknown[]).map((item) =>
+      SportMonksCountrySchema.parse(item)
+    );
+    const normalized = normalizeCountries(countries);
 
     return NextResponse.json(normalized);
   } catch (error) {
-    console.error("Error fetching livescores:", error);
+    console.error("Error fetching countries:", error);
 
     // Parse upstream error status if available
     if (error instanceof Error && error.message.startsWith("SportMonks ")) {
@@ -59,7 +67,7 @@ export async function GET(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: "Failed to fetch livescores" },
+      { error: "Failed to fetch countries" },
       { status: 500 }
     );
   }

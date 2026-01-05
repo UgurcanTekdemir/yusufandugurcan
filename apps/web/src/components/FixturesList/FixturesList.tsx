@@ -21,17 +21,27 @@ function cn(...classes: (string | undefined)[]): string {
 
 // Fetch fixtures
 async function fetchFixtures(
-  leagueId: string,
+  leagueId?: string,
   date?: string | null
 ): Promise<FixtureDTO[]> {
   const params = new URLSearchParams();
-  params.set("leagueId", leagueId);
+  if (leagueId) {
+    params.set("leagueId", leagueId);
+  }
   if (date) {
     params.set("date", date);
+  } else {
+    // Default to today's date if no date provided
+    const today = new Date().toISOString().split("T")[0];
+    params.set("date", today);
   }
-  const response = await fetch(`/api/sm/fixtures?${params.toString()}`);
+  
+  // Use the new /api/sm/fixtures/date endpoint which supports optional leagueId
+  const response = await fetch(`/api/sm/fixtures/date?${params.toString()}`);
   if (!response.ok) {
-    throw new Error("Failed to fetch fixtures");
+    const error = new Error("Failed to fetch fixtures") as Error & { status?: number };
+    error.status = response.status;
+    throw error;
   }
   return response.json();
 }
@@ -407,7 +417,6 @@ export function FixturesList({ leagueId, date }: FixturesListProps) {
     new Set()
   );
 
-  // Only fetch if leagueId is provided
   const {
     data: fixtures = [],
     isLoading,
@@ -416,13 +425,11 @@ export function FixturesList({ leagueId, date }: FixturesListProps) {
   } = useQuery<FixtureDTO[], Error>({
     queryKey: ["fixtures", leagueId, date],
     queryFn: () => {
-      if (!leagueId) {
-        return Promise.resolve([]);
-      }
-      return fetchFixtures(leagueId, date);
+      return fetchFixtures(leagueId || undefined, date);
     },
-    enabled: !!leagueId,
+    enabled: true, // Always enabled, even without leagueId
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: (count, err) => (err as Error & { status?: number })?.status !== 400 && count < 2,
   });
 
   const toggleFixture = (fixtureId: string | number) => {
@@ -436,16 +443,6 @@ export function FixturesList({ leagueId, date }: FixturesListProps) {
       return next;
     });
   };
-
-  if (!leagueId) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <p className="text-text-muted text-sm">
-          Bir lig seçin
-        </p>
-      </div>
-    );
-  }
 
   if (isLoading) {
     return (
@@ -472,7 +469,9 @@ export function FixturesList({ leagueId, date }: FixturesListProps) {
   if (fixtures.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <p className="text-text-muted text-sm">Bu tarih için maç bulunamadı</p>
+        <p className="text-text-muted text-sm">
+          {leagueId ? "Bu lig için maç bulunamadı" : "Bugün için maç bulunamadı"}
+        </p>
       </div>
     );
   }

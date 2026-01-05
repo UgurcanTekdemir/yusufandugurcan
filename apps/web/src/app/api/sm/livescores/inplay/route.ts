@@ -1,6 +1,5 @@
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { sportmonksClient } from "@/lib/sportmonks/client";
 import {
   SportMonksFixtureSchema,
@@ -9,9 +8,8 @@ import {
 import { normalizeLiveFixtures } from "@/lib/sportmonks/dto";
 
 /**
- * GET /api/sm/livescores
- * Fetch live scores from SportMonks API
- * Uses /livescores/inplay endpoint
+ * GET /api/sm/livescores/inplay?include=participants,scores
+ * Fetch live scores (inplay) from SportMonks API
  */
 export async function GET(request: NextRequest) {
   try {
@@ -29,29 +27,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(normalized);
   } catch (error) {
-    console.error("Error fetching livescores:", error);
-
-    // Parse upstream error status if available
-    if (error instanceof Error && error.message.startsWith("SportMonks ")) {
-      const match = error.message.match(/SportMonks (\d+): (.+)/);
-      if (match) {
-        const status = parseInt(match[1]!, 10);
-        const body = match[2]!;
-        return NextResponse.json(
-          { error: `Upstream error: ${error.message}`, upstream: body },
-          { status }
-        );
-      }
-    }
-
-    // Upstream schema bozulduysa bu kullanıcı hatası değil:
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Upstream response schema mismatch", details: error.errors },
-        { status: 502 }
-      );
-    }
-
+    console.error("Error fetching livescores inplay:", error);
     if (error instanceof Error) {
       return NextResponse.json(
         { error: error.message },

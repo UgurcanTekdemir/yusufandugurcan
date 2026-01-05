@@ -12,8 +12,9 @@ export const SportMonksCountrySchema = z
   .object({
     id: z.number(),
     name: z.string(),
-    code: z.string().optional(),
-    image_path: z.string().optional(),
+    code: z.string().nullable().optional(),
+    continent_id: z.number().nullable().optional(),
+    image_path: z.string().nullable().optional(),
   })
   .passthrough();
 
@@ -26,15 +27,16 @@ export const SportMonksLeagueSchema = z
   .object({
     id: z.number(),
     name: z.string(),
-    country_id: z.number().optional(),
-    type: z.string().optional(),
-    image_path: z.string().optional(),
+    country_id: z.number().nullable().optional(),
+    type: z.string().nullable().optional(),
+    image_path: z.string().nullable().optional(),
     country: z
       .object({
         id: z.number(),
         name: z.string(),
-        code: z.string().optional(),
+        code: z.string().nullable().optional(),
       })
+      .nullable()
       .optional(),
   })
   .passthrough();
@@ -101,16 +103,17 @@ export const SportMonksTeamSchema = z
 export const SportMonksFixtureSchema = z
   .object({
     id: z.number(),
-    name: z.string().optional(),
-    starting_at: z.string().optional(),
-    result_info: z.string().optional(),
-    state: z.string().optional(),
+    name: z.string().nullable().optional(),
+    starting_at: z.string().nullable().optional(),
+    result_info: z.string().nullable().optional(),
+    state: z.string().nullable().optional(),
     scores: z
       .object({
-        score: z.string().optional(),
-        home_score: z.number().optional(),
-        away_score: z.number().optional(),
+        score: z.string().nullable().optional(),
+        home_score: z.number().nullable().optional(),
+        away_score: z.number().nullable().optional(),
       })
+      .nullable()
       .optional(),
     participants: z
       .array(
@@ -119,11 +122,13 @@ export const SportMonksFixtureSchema = z
           name: z.string(),
           meta: z
             .object({
-              location: z.string().optional(),
+              location: z.string().nullable().optional(),
             })
+            .nullable()
             .optional(),
         })
       )
+      .nullable()
       .optional(),
   })
   .passthrough();
@@ -194,7 +199,7 @@ export type SportMonksOdds = z.infer<typeof SportMonksOddsSchema>;
  */
 export const SportMonksResponseSchema = z
   .object({
-    data: z.array(z.unknown()),
+    data: z.any(),
   })
   .passthrough();
 
