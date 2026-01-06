@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { HeaderBar, LeftSidebar, RightBetslip } from "@/components";
+import { HeaderBar, LeftSidebar, RightBetslip, Footer } from "@/components";
 import { useBetslipStore } from "@/stores/betslipStore";
 
 export default function UserLayout({
@@ -31,7 +31,7 @@ export default function UserLayout({
       />
 
       {/* Main Layout */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0">
         {/* Left Sidebar */}
         <LeftSidebar
           isOpen={leftDrawerOpen}
@@ -39,8 +39,12 @@ export default function UserLayout({
         />
 
         {/* Main Content */}
-        <main className="flex-1 min-w-0 overflow-hidden">
-          {children}
+        <main className="flex-1 min-w-0 flex flex-col">
+          <div className="flex-1 overflow-y-auto">
+            {children}
+          </div>
+          {/* Footer - Hide on mobile when drawer is open */}
+          {!leftDrawerOpen && <Footer />}
         </main>
 
         {/* Right Betslip */}
