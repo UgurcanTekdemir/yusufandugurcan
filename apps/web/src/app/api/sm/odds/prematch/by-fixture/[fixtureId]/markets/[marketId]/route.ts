@@ -8,8 +8,12 @@ import {
 } from "@/lib/sportmonks/schemas";
 import { normalizeOdds, transformOddsArrayToMarketsFormat } from "@/lib/sportmonks/dto";
 
+const ParamsSchema = z.object({
+  fixtureId: z.string().regex(/^\d+$/, "Fixture ID must be a number"),
+  marketId: z.string().regex(/^\d+$/, "Market ID must be a number"),
+});
+
 const QuerySchema = z.object({
-  fixtureId: z.string().min(1),
   include: z.string().optional(),
   select: z.string().optional(),
   filters: z.string().optional(),
@@ -17,62 +21,74 @@ const QuerySchema = z.object({
 });
 
 /**
- * GET /api/sm/odds/inplay?fixtureId=123
- * Fetch in-play odds for a fixture
+ * GET /api/sm/odds/prematch/by-fixture/[fixtureId]/markets/[marketId]?include=market;bookmaker;fixture&filters=bookmakers:23
+ * Fetch pre-match odds for a fixture filtered by market ID
+ * 
+ * Query parameters:
+ * - include: market, bookmaker, fixture (semicolon-separated)
+ * - select: Select specific fields
+ * - filters: Static filters (bookmakers:2,14 | winningOdds) or dynamic filters
+ * - locale: Translate name fields
+ * 
+ * Static filters:
+ * - bookmakers:2,14 - Filter by bookmaker IDs
+ * - winningOdds - Filter all winning odds
+ * 
+ * Response format: Flat array of odds objects (same as Get Odds by Fixture ID)
  */
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { fixtureId: string; marketId: string } }
+) {
   try {
+    // Validate route params
+    const routeParams = ParamsSchema.parse({
+      fixtureId: params.fixtureId,
+      marketId: params.marketId,
+    });
+
+    // Parse query parameters
     const searchParams = request.nextUrl.searchParams;
     const query = QuerySchema.parse({
-      fixtureId: searchParams.get("fixtureId") ?? "",
       include: searchParams.get("include") || undefined,
       select: searchParams.get("select") || undefined,
       filters: searchParams.get("filters") || undefined,
       locale: searchParams.get("locale") || undefined,
     });
 
-    const fixtureId = Number(query.fixtureId);
-    
-    // Optimize default include if not provided
-    const optimizedInclude = query.include || "markets:name;bookmakers:name";
-    
-    // Default to Bet365 (bookmaker ID: 2) if no filters provided
-    const filters = query.filters || "bookmakers:2";
-    
-    const response = await sportmonksClient.getInplayOdds(
+    const fixtureId = Number(routeParams.fixtureId);
+    const marketId = Number(routeParams.marketId);
+
+    const response = await sportmonksClient.getPrematchOddsByFixtureAndMarket(
       fixtureId,
+      marketId,
       {
-        include: optimizedInclude,
+        include: query.include,
         select: query.select,
-        filters: filters,
+        filters: query.filters,
         locale: query.locale,
       }
     );
 
-    // SportMonks API may return different formats (same as pre-match):
-    // 1. Flat array format (primary): { data: [{ id, fixture_id, market_id, label, value, ... }] }
-    // 2. Nested markets format: { data: { markets: [...] } }
-    // 3. Fixture with odds include: { data: { id: ..., odds: { inPlay: { markets: [...] } } } }
-    // 4. Fixture with odds array: { data: { id: ..., odds: [...] } }
+    // Handle different response formats (similar to prematch/route.ts)
+    // Primary format: Flat array of odds objects
     let oddsItem: unknown;
 
     if (response && typeof response === "object" && "data" in response) {
-      // Response with data wrapper
       const data = (response as { data: unknown }).data;
       
-      // Check if data is a flat array of odds objects (primary format for in-play odds)
+      // Check if data is a flat array of odds objects (primary format for this endpoint)
       if (Array.isArray(data) && data.length > 0) {
         const firstItem = data[0] as Record<string, unknown>;
         // Check if it's a flat odds array (has fixture_id, market_id, label, value)
         if (firstItem.fixture_id && firstItem.market_id && firstItem.label && firstItem.value) {
-          console.log("[INPLAY ODDS] Detected flat odds array format, transforming to markets format");
+          console.log("[PREMATCH ODDS BY MARKET] Detected flat odds array format, transforming to markets format");
           oddsItem = transformOddsArrayToMarketsFormat(fixtureId, data as Array<{
             id?: number;
             market_id: number;
             label: string;
             value: string;
             name?: string;
-            sort_order?: number | null;
             total?: string | null;
             handicap?: string | null;
             market_description?: string | null;
@@ -81,13 +97,12 @@ export async function GET(request: NextRequest) {
             fractional?: string | null;
             american?: string | null;
             winning?: boolean | null;
-            suspended?: boolean | null; // In-play odds specific field
             stopped?: boolean | null;
             participants?: string | null;
             latest_bookmaker_update?: string | null;
             [key: string]: unknown;
           }>);
-          console.log("[INPLAY ODDS] Transformed flat odds array to markets format:", {
+          console.log("[PREMATCH ODDS BY MARKET] Transformed flat odds array to markets format:", {
             marketsCount: (oddsItem as { markets?: unknown[] }).markets?.length || 0,
           });
         } else {
@@ -95,123 +110,93 @@ export async function GET(request: NextRequest) {
           oddsItem = data[0];
         }
       } else if (data && typeof data === "object" && !Array.isArray(data)) {
-        // Check if data is a fixture object with odds included
         const dataObj = data as Record<string, unknown>;
-        
-        // If fixture has odds.inPlay nested structure
+
         if (dataObj.odds && typeof dataObj.odds === "object") {
           const odds = dataObj.odds as Record<string, unknown>;
-          
-          // Check if odds is an array (flat format)
+
           if (Array.isArray(odds)) {
-            console.log("[INPLAY ODDS] Detected odds array format, transforming to markets format");
+            console.log("[PREMATCH ODDS BY MARKET] Detected odds array format, transforming to markets format");
             oddsItem = transformOddsArrayToMarketsFormat(fixtureId, odds as Array<{
               id?: number;
               market_id: number;
               label: string;
               value: string;
               name?: string;
-              sort_order?: number | null;
               total?: string | null;
               handicap?: string | null;
               market_description?: string | null;
-              suspended?: boolean | null; // In-play odds specific field
               [key: string]: unknown;
             }>);
-            console.log("[INPLAY ODDS] Transformed odds array to markets format:", {
-              marketsCount: (oddsItem as { markets?: unknown[] }).markets?.length || 0,
-            });
-          } else if (odds.inPlay && typeof odds.inPlay === "object") {
-            oddsItem = odds.inPlay;
-            console.log("[INPLAY ODDS] Extracted odds from fixture.odds.inPlay structure");
-          } else if (odds.in_play && typeof odds.in_play === "object") {
-            oddsItem = odds.in_play;
-            console.log("[INPLAY ODDS] Extracted odds from fixture.odds.in_play structure");
+          } else if (odds.preMatch && typeof odds.preMatch === "object") {
+            oddsItem = odds.preMatch;
+          } else if (odds.pre_match && typeof odds.pre_match === "object") {
+            oddsItem = odds.pre_match;
           } else {
-            // If odds is directly the odds object
             oddsItem = odds;
-            console.log("[INPLAY ODDS] Using odds object directly from fixture.odds");
           }
         } else if (dataObj.markets) {
-          // If data is already an odds object with markets
           oddsItem = dataObj;
-          console.log("[INPLAY ODDS] Using data object directly (has markets)");
         } else {
-          // Data is a single object (could be fixture or odds)
           oddsItem = dataObj;
         }
       } else if (Array.isArray(data)) {
-        // Data is an array but empty
         if (data.length === 0) {
           return NextResponse.json(
-            { error: "No odds found for this fixture" },
+            { error: "No odds found for this fixture and market" },
             { status: 404 }
           );
         }
         oddsItem = data[0];
       } else {
-        // Data is a single value
         oddsItem = data;
       }
     } else if (Array.isArray(response)) {
       // Direct array response
       if (response.length === 0) {
         return NextResponse.json(
-          { error: "No odds found for this fixture" },
+          { error: "No odds found for this fixture and market" },
           { status: 404 }
         );
       }
       // Check if it's flat odds array format
       const firstItem = response[0] as Record<string, unknown>;
       if (firstItem.fixture_id && firstItem.market_id && firstItem.label && firstItem.value) {
-        console.log("[INPLAY ODDS] Detected flat odds array format (direct array), transforming to markets format");
+        console.log("[PREMATCH ODDS BY MARKET] Detected flat odds array format (direct array), transforming to markets format");
         oddsItem = transformOddsArrayToMarketsFormat(fixtureId, response as Array<{
           id?: number;
           market_id: number;
           label: string;
           value: string;
           name?: string;
-          sort_order?: number | null;
           total?: string | null;
           handicap?: string | null;
-          suspended?: boolean | null; // In-play odds specific field
           [key: string]: unknown;
         }>);
       } else {
         oddsItem = response[0];
       }
     } else {
-      // Direct object response
       oddsItem = response;
     }
 
-    // Final check: ensure we have a single object, not an array
-    if (Array.isArray(oddsItem)) {
-      console.error("[INPLAY ODDS] ERROR: oddsItem is still an array after processing");
-      return NextResponse.json(
-        { error: "Unexpected array format in odds response", details: "Expected single odds object, received array" },
-        { status: 502 }
-      );
-    }
-
-    // Ensure oddsItem has required fields (id and fixture_id may be missing)
-    // fixtureId is already defined above, so we don't need to redefine it
+    // Ensure required fields
     let oddsWithRequiredFields = oddsItem;
-    
+
     if (oddsItem && typeof oddsItem === "object" && !Array.isArray(oddsItem)) {
       const oddsObj = oddsItem as Record<string, unknown>;
-      // Add fixture_id if missing
-      if (!("fixture_id" in oddsObj)) {
+
+      if (Array.isArray(oddsObj.markets)) {
         oddsWithRequiredFields = {
           ...oddsObj,
-          fixture_id: fixtureId,
+          fixture_id: oddsObj.fixture_id ?? fixtureId,
+          id: oddsObj.id ?? oddsObj.fixture_id ?? fixtureId,
         };
-      }
-      // Add id if missing (use fixture_id as id)
-      if (!("id" in oddsObj)) {
+      } else {
         oddsWithRequiredFields = {
-          ...(oddsWithRequiredFields as Record<string, unknown>),
-          id: (oddsWithRequiredFields as Record<string, unknown>).fixture_id || fixtureId,
+          ...oddsObj,
+          fixture_id: oddsObj.fixture_id ?? fixtureId,
+          id: oddsObj.id ?? oddsObj.fixture_id ?? fixtureId,
         };
       }
     }
@@ -221,31 +206,34 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(normalized);
   } catch (error) {
-    console.error("Error fetching in-play odds:", error);
+    console.error("Error fetching prematch odds by fixture and market:", error);
 
-    // Enhanced error logging
     if (error instanceof z.ZodError) {
-      console.error("[INPLAY ODDS] Zod validation error:", {
-        errors: error.errors,
-        fixtureId: request.nextUrl.searchParams.get("fixtureId"),
-      });
-      return NextResponse.json(
-        { error: "Invalid query parameters", details: error.errors },
-        { status: 400 }
+      const isRouteError = error.errors.some(
+        (err) => err.path.length === 1 && (err.path[0] === "fixtureId" || err.path[0] === "marketId")
       );
+
+      if (isRouteError) {
+        return NextResponse.json(
+          { error: "Invalid route parameters", details: error.errors },
+          { status: 400 }
+        );
+      } else {
+        return NextResponse.json(
+          {
+            error: "Invalid response format from SportMonks API",
+            details: error.errors,
+          },
+          { status: 502 }
+        );
+      }
     }
 
-    // Parse upstream error status if available
     if (error instanceof Error && error.message.startsWith("SportMonks ")) {
       const match = error.message.match(/SportMonks (\d+): (.+)/);
       if (match) {
         const status = parseInt(match[1]!, 10);
         const body = match[2]!;
-        console.error("[INPLAY ODDS] Upstream error:", {
-          status,
-          body: body.substring(0, 500),
-          fixtureId: request.nextUrl.searchParams.get("fixtureId"),
-        });
         return NextResponse.json(
           { error: `Upstream error: ${error.message}`, upstream: body },
           { status }
@@ -253,22 +241,8 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Upstream schema mismatch
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Upstream response schema mismatch", details: error.errors },
-        { status: 502 }
-      );
-    }
-
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
-    }
     return NextResponse.json(
-      { error: "Failed to fetch in-play odds" },
+      { error: error instanceof Error ? error.message : "Failed to fetch prematch odds" },
       { status: 500 }
     );
   }

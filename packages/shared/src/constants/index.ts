@@ -43,3 +43,9 @@ export const bookmakerConfig: BookmakerConfig[] = [
     selectedBookmakerId: null, // Use first available bookmaker if null
   },
 ];
+
+export {
+  bet365LikeMarketDisplay,
+  type MarketDisplayConfig,
+  type MarketTemplate,
+} from "./marketDisplay";

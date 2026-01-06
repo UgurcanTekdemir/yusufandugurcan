@@ -96,17 +96,44 @@ export interface FixtureDTO {
   leagueId?: string | number;
   leagueName?: string;
   isLive: boolean;
+  isFinished?: boolean; // True if fixture has finished (FT, FT_PEN, CANCL, etc.)
+  isStarted?: boolean; // True if fixture has started (LIVE, HT, FT, etc.)
   hasOdds?: boolean;
   score?: Score;
+  minute?: number | null; // Current minute of the match (for live matches)
+  homeTeamLogo?: string | null; // Team logo URL for home team
+  awayTeamLogo?: string | null; // Team logo URL for away team
+  state?: string | null; // Match state (NS, LIVE, HT, FT, FT_PEN, etc.)
 }
 
 /**
  * Market odds structure
+ * Based on SportMonks API v3 Pre-match Odds fields
  */
 export interface MarketOdds {
   market: string;
   selection: string;
   odds: number;
+  marketId?: number;
+  devName?: string;
+  label?: string;
+  template?: import("../constants/marketDisplay.js").MarketTemplate;
+  line?: number | string | null;
+  selectionRaw?: string;
+  group?: string;
+  // Additional SportMonks pre-match odds fields
+  marketDescription?: string | null;
+  probability?: string | null;
+  dp3?: string | null;
+  fractional?: string | null;
+  american?: string | null;
+  winning?: boolean | null;
+  stopped?: boolean | null;
+  total?: string | null;
+  handicap?: string | null;
+  participants?: string | null;
+  latestBookmakerUpdate?: string | null;
+  bookmakerId?: number;
 }
 
 /**
@@ -167,6 +194,16 @@ export interface StageDTO {
  * Live Fixture DTO structure
  * Extends FixtureDTO with live-specific fields
  */
+export interface PeriodInfo {
+  ticking?: boolean; // Is this period currently being played?
+  minutes?: number; // Current minute of the period
+  seconds?: number; // Seconds within the current minute
+  has_timer?: boolean; // Is detailed timer available?
+  counts_from?: number; // Period count starts from (e.g., 0 for 1st half, 45 for 2nd half)
+  period_length?: number; // Planned duration of period (usually 45)
+  time_added?: number; // Added time (injury time)
+}
+
 export interface LiveFixtureDTO {
   fixtureId: string | number;
   homeTeam: string;
@@ -174,6 +211,10 @@ export interface LiveFixtureDTO {
   leagueId: string | number;
   minute?: number;
   score?: Score;
+  homeTeamLogo?: string | null; // Team logo URL for home team
+  awayTeamLogo?: string | null; // Team logo URL for away team
+  startingAt?: string | null; // Starting time for calculating elapsed time
+  currentPeriod?: PeriodInfo | null; // Current period information (ticking=true)
 }
 
 /**

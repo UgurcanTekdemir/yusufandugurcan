@@ -13,23 +13,25 @@ const QuerySchema = z.object({
   select: z.string().optional(),
   filters: z.string().optional(),
   locale: z.string().optional(),
+  order: z.enum(["asc", "desc"]).optional(),
+  per_page: z.string().optional().transform((val) => val ? parseInt(val, 10) : undefined),
+  page: z.string().optional().transform((val) => val ? parseInt(val, 10) : undefined),
 });
 
 /**
- * GET /api/sm/odds/inplay/latest?include=markets:name;bookmakers:name&filters=bookmakers:23
- * Fetch latest updated in-play odds (updated in the last 10 seconds)
+ * GET /api/sm/odds/inplay/all?include=markets:name;bookmakers:name&filters=...&order=desc&per_page=30&page=1
+ * Fetch all in-play odds
  * 
  * Query parameters:
  * - include: markets, bookmakers, fixture (semicolon-separated)
  * - select: Select specific fields
- * - filters: Static filters (bookmakers:2,14 | winningOdds) or dynamic filters
+ * - filters: Filter the response
  * - locale: Translate name fields
+ * - order: asc or desc (defaults to asc)
+ * - per_page: Results per page (max 50, defaults to 25)
+ * - page: Page number for pagination
  * 
- * Note: This endpoint returns odds that were updated in the last 10 seconds.
- * Poll every 10 seconds to match the fixed update window (360 calls per hour).
- * Empty array means no changes in the last 10 seconds.
- * 
- * Response format: Flat array of odds objects, grouped by fixture_id
+ * Response format: Flat array of odds objects, grouped by fixture_id and market_id
  */
 export async function GET(request: NextRequest) {
   try {
@@ -39,25 +41,23 @@ export async function GET(request: NextRequest) {
       select: searchParams.get("select") || undefined,
       filters: searchParams.get("filters") || undefined,
       locale: searchParams.get("locale") || undefined,
+      order: searchParams.get("order") || undefined,
+      per_page: searchParams.get("per_page") || undefined,
+      page: searchParams.get("page") || undefined,
     });
 
-    const response = await sportmonksClient.getInplayOddsLatest({
+    const response = await sportmonksClient.getAllInplayOdds({
       include: query.include,
       select: query.select,
       filters: query.filters,
       locale: query.locale,
+      order: query.order,
+      per_page: query.per_page,
+      page: query.page,
     });
 
     // Validate response structure (expecting collection response with data array)
     const validated = SportMonksMultiResponseSchema.parse(response);
-    
-    // Handle empty data array (no updates in last 10 seconds)
-    if (!Array.isArray(validated.data) || validated.data.length === 0) {
-      return NextResponse.json({
-        data: [],
-        pagination: validated.pagination,
-      });
-    }
     
     // The response is a flat array of odds objects
     // Each object has: id, fixture_id, market_id, bookmaker_id, label, value, name, etc.
@@ -70,15 +70,14 @@ export async function GET(request: NextRequest) {
       label: string;
       value: string;
       name?: string;
-      sort_order?: number | null;
       market_description?: string | null;
       probability?: string | null;
       dp3?: string | null;
       fractional?: string | null;
       american?: string | null;
       winning?: boolean | null;
-      suspended?: boolean | null; // In-play odds specific field
       stopped?: boolean | null;
+      suspended?: boolean | null; // In-play odds specific field
       total?: string | null;
       handicap?: string | null;
       participants?: string | null;
@@ -109,7 +108,7 @@ export async function GET(request: NextRequest) {
       pagination: validated.pagination,
     });
   } catch (error) {
-    console.error("Error fetching latest inplay odds:", error);
+    console.error("Error fetching all inplay odds:", error);
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -134,7 +133,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to fetch latest inplay odds" },
+      { error: error instanceof Error ? error.message : "Failed to fetch all inplay odds" },
       { status: 500 }
     );
   }

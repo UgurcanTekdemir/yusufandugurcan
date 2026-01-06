@@ -3,16 +3,34 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { sportmonksClient } from "@/lib/sportmonks/client";
 import { SportMonksOddsSchema } from "@/lib/sportmonks/schemas";
-import { normalizeOdds } from "@/lib/sportmonks/dto";
+import { normalizeOdds, transformOddsArrayToMarketsFormat } from "@/lib/sportmonks/dto";
 
 const QuerySchema = z.object({
   fixtureId: z.string().min(1, "fixtureId is required"),
-  bookmakerId: z.string().optional(),
+  bookmakerId: z.string().min(1, "bookmakerId is required"),
+  include: z.string().optional(),
+  select: z.string().optional(),
+  filters: z.string().optional(),
+  locale: z.string().optional(),
 });
 
 /**
- * GET /api/sm/odds/prematch/by-fixture?fixtureId=123&bookmakerId=2
- * Fetch pre-match odds for a fixture from a specific bookmaker (default: bet365, ID: 2)
+ * GET /api/sm/odds/prematch/by-fixture?fixtureId=123&bookmakerId=23&include=market;bookmaker;fixture&filters=markets:1,14
+ * Fetch pre-match odds for a fixture from a specific bookmaker
+ * 
+ * Query parameters:
+ * - fixtureId: Required - Fixture ID
+ * - bookmakerId: Required - Bookmaker ID (e.g., 23 for Bet365)
+ * - include: market, bookmaker, fixture (semicolon-separated)
+ * - select: Select specific fields
+ * - filters: Static filters (markets:12,14 | winningOdds) or dynamic filters
+ * - locale: Translate name fields
+ * 
+ * Static filters:
+ * - markets:12,14 - Filter by market IDs
+ * - winningOdds - Filter all winning odds
+ * 
+ * Response format: Flat array of odds objects (same as Get Odds by Fixture ID)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -20,32 +38,159 @@ export async function GET(request: NextRequest) {
     const query = QuerySchema.parse({
       fixtureId: searchParams.get("fixtureId"),
       bookmakerId: searchParams.get("bookmakerId"),
+      include: searchParams.get("include") || undefined,
+      select: searchParams.get("select") || undefined,
+      filters: searchParams.get("filters") || undefined,
+      locale: searchParams.get("locale") || undefined,
     });
 
-    const bookmakerId = query.bookmakerId
-      ? Number(query.bookmakerId)
-      : 2; // Default to bet365
+    const bookmakerId = Number(query.bookmakerId);
+    const fixtureId = Number(query.fixtureId);
 
-    const response = await sportmonksClient.getOddsPrematchByFixture(
-      Number(query.fixtureId),
-      bookmakerId
+    const response = await sportmonksClient.getPrematchOddsByFixtureAndBookmaker(
+      fixtureId,
+      bookmakerId,
+      {
+        include: query.include,
+        select: query.select,
+        filters: query.filters,
+        locale: query.locale,
+      }
     );
 
-    // For single fixture odds, the response structure may differ
-    // Check if it's wrapped in a data array or a single object
-    const oddsData = (response as { data?: unknown } | unknown[]);
+    // Handle different response formats (similar to prematch/route.ts)
+    // Primary format: Flat array of odds objects
     let oddsItem: unknown;
 
-    if (Array.isArray(oddsData)) {
-      oddsItem = oddsData[0];
-    } else if (oddsData && typeof oddsData === "object" && "data" in oddsData) {
-      const data = oddsData.data;
-      oddsItem = Array.isArray(data) ? data[0] : data;
+    if (response && typeof response === "object" && "data" in response) {
+      const data = (response as { data: unknown }).data;
+      
+      // Check if data is a flat array of odds objects (primary format for this endpoint)
+      if (Array.isArray(data) && data.length > 0) {
+        const firstItem = data[0] as Record<string, unknown>;
+        // Check if it's a flat odds array (has fixture_id, market_id, label, value)
+        if (firstItem.fixture_id && firstItem.market_id && firstItem.label && firstItem.value) {
+          console.log("[PREMATCH ODDS BY BOOKMAKER] Detected flat odds array format, transforming to markets format");
+          oddsItem = transformOddsArrayToMarketsFormat(fixtureId, data as Array<{
+            id?: number;
+            market_id: number;
+            label: string;
+            value: string;
+            name?: string;
+            total?: string | null;
+            handicap?: string | null;
+            market_description?: string | null;
+            probability?: string | null;
+            dp3?: string | null;
+            fractional?: string | null;
+            american?: string | null;
+            winning?: boolean | null;
+            stopped?: boolean | null;
+            participants?: string | null;
+            latest_bookmaker_update?: string | null;
+            [key: string]: unknown;
+          }>);
+          console.log("[PREMATCH ODDS BY BOOKMAKER] Transformed flat odds array to markets format:", {
+            marketsCount: (oddsItem as { markets?: unknown[] }).markets?.length || 0,
+          });
+        } else {
+          // Array but not flat odds format, take first element
+          oddsItem = data[0];
+        }
+      } else if (data && typeof data === "object" && !Array.isArray(data)) {
+        const dataObj = data as Record<string, unknown>;
+
+        if (dataObj.odds && typeof dataObj.odds === "object") {
+          const odds = dataObj.odds as Record<string, unknown>;
+
+          if (Array.isArray(odds)) {
+            console.log("[PREMATCH ODDS BY BOOKMAKER] Detected odds array format, transforming to markets format");
+            oddsItem = transformOddsArrayToMarketsFormat(fixtureId, odds as Array<{
+              id?: number;
+              market_id: number;
+              label: string;
+              value: string;
+              name?: string;
+              total?: string | null;
+              handicap?: string | null;
+              market_description?: string | null;
+              [key: string]: unknown;
+            }>);
+          } else if (odds.preMatch && typeof odds.preMatch === "object") {
+            oddsItem = odds.preMatch;
+          } else if (odds.pre_match && typeof odds.pre_match === "object") {
+            oddsItem = odds.pre_match;
+          } else {
+            oddsItem = odds;
+          }
+        } else if (dataObj.markets) {
+          oddsItem = dataObj;
+        } else {
+          oddsItem = dataObj;
+        }
+      } else if (Array.isArray(data)) {
+        if (data.length === 0) {
+          return NextResponse.json(
+            { error: "No odds found for this fixture and bookmaker" },
+            { status: 404 }
+          );
+        }
+        oddsItem = data[0];
+      } else {
+        oddsItem = data;
+      }
+    } else if (Array.isArray(response)) {
+      // Direct array response
+      if (response.length === 0) {
+        return NextResponse.json(
+          { error: "No odds found for this fixture and bookmaker" },
+          { status: 404 }
+        );
+      }
+      // Check if it's flat odds array format
+      const firstItem = response[0] as Record<string, unknown>;
+      if (firstItem.fixture_id && firstItem.market_id && firstItem.label && firstItem.value) {
+        console.log("[PREMATCH ODDS BY BOOKMAKER] Detected flat odds array format (direct array), transforming to markets format");
+        oddsItem = transformOddsArrayToMarketsFormat(fixtureId, response as Array<{
+          id?: number;
+          market_id: number;
+          label: string;
+          value: string;
+          name?: string;
+          total?: string | null;
+          handicap?: string | null;
+          [key: string]: unknown;
+        }>);
+      } else {
+        oddsItem = response[0];
+      }
     } else {
-      oddsItem = oddsData;
+      oddsItem = response;
     }
 
-    const parsed = SportMonksOddsSchema.parse(oddsItem);
+    // Ensure required fields
+    // Note: fixtureId was already defined above, reuse it
+    let oddsWithRequiredFields = oddsItem;
+
+    if (oddsItem && typeof oddsItem === "object" && !Array.isArray(oddsItem)) {
+      const oddsObj = oddsItem as Record<string, unknown>;
+
+      if (Array.isArray(oddsObj.markets)) {
+        oddsWithRequiredFields = {
+          ...oddsObj,
+          fixture_id: oddsObj.fixture_id ?? fixtureId,
+          id: oddsObj.id ?? oddsObj.fixture_id ?? fixtureId,
+        };
+      } else {
+        oddsWithRequiredFields = {
+          ...oddsObj,
+          fixture_id: oddsObj.fixture_id ?? fixtureId,
+          id: oddsObj.id ?? oddsObj.fixture_id ?? fixtureId,
+        };
+      }
+    }
+
+    const parsed = SportMonksOddsSchema.parse(oddsWithRequiredFields);
     const normalized = normalizeOdds(parsed);
 
     return NextResponse.json(normalized);
